@@ -138,7 +138,7 @@ object UberEatsExample {
 
   }
 
-  implicit def orderConfirmationStatusSchema: Schema[OrderConfirmationStatus.Confirmed.type] = ???
+  implicit def orderConfirmationStatusSchema: Schema[OrderConfirmationStatus] = ???
 
   lazy val getOrderConfirmationStatus: Activity[(Restaurant, Order), OrderConfirmationStatus] =
     Activity[(Restaurant, Order), OrderConfirmationStatus](
