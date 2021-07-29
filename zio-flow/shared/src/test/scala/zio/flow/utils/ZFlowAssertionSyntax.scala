@@ -52,10 +52,6 @@ object ZFlowAssertionSyntax {
 
   import Mocks._
   implicit final class InMemoryZFlowAssertion[R, E, A](private val zflow: ZFlow[Any, E, A]) {
-//    def <=>(that: A)(implicit schemaA : Schema[A], schemaE: Schema[E]) = {
-//      val compileResult = evaluateTestInMem
-//      assertM(compileResult)(equalTo(that))
-//    }
 
     def evaluateTestInMem(implicit schemaA: Schema[A], schemaE: Schema[E]): ZIO[Clock with Console, E, A] = {
       val compileResult = for {

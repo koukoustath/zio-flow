@@ -4,7 +4,6 @@ import zio.schema.Schema
 
 class RemoteFractionalSyntax[A](val self : Remote[A]) {
 
-
   final def sin[A1 >: A](implicit fractional: Fractional[A1]): Remote[A1] =
     Remote.SinFractional(self, fractional)
 
