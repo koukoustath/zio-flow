@@ -6,15 +6,10 @@ import java.time.Duration
 import zio._
 import zio.clock._
 import zio.console.putStrLn
-import zio.flow._
-import zio.schema._
-
-import zio._
-import zio.clock._
 import zio.flow.ZFlow._
 import zio.flow._
 import zio.flow.server.PersistentExecutor.{ State, TState }
-import zio.schema.Schema
+import zio.schema.{Schema, _}
 
 final case class PersistentExecutor(
   clock: Clock.Service,
