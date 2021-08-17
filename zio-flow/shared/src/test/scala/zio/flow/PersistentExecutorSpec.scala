@@ -4,8 +4,7 @@ import zio.flow.utils.ZFlowAssertionSyntax.InMemoryZFlowAssertion
 import zio.schema.Schema
 import zio.test.Assertion.equalTo
 import zio.test.TestAspect.ignore
-import zio.test.{ DefaultRunnableSpec, ZSpec, assertM }
-import zio.test.{ Annotations, Spec, TestFailure, TestSuccess }
+import zio.test.{ Annotations, DefaultRunnableSpec, Spec, TestFailure, TestSuccess, ZSpec, assertM }
 
 object PersistentExecutorSpec extends DefaultRunnableSpec {
 
@@ -33,14 +32,14 @@ object PersistentExecutorSpec extends DefaultRunnableSpec {
         .foldM(_ => ZFlow.unit, _ => ZFlow.unit)
         .evaluateLivePersistent(implicitly[Schema[Unit]], nothingSchema)
       assertM(compileResult)(equalTo(()))
-    } @@ignore,
+    } @@ ignore,
     testM("Test Fold - error side") {
       val compileResult = ZFlow
         .fail(15)
         .foldM(_ => ZFlow.unit, _ => ZFlow.unit)
         .evaluateLivePersistent(implicitly[Schema[Unit]], nothingSchema)
       assertM(compileResult)(equalTo(()))
-    } @@ignore,
+    } @@ ignore,
     testM("Test input") {
       val compileResult = ZFlow.input[Int].provide(12).evaluateLivePersistent(implicitly[Schema[Int]], nothingSchema)
       assertM(compileResult)(equalTo(12))
