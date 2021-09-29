@@ -78,7 +78,7 @@ object ZFlowExecutorSpec extends DefaultRunnableSpec {
         .evaluateTestInMem(implicitly[Schema[Int]], nothingSchema)
       assertM(compileResult)(equalTo(12))
     },
-    testM("Test Input and Provide") {
+    testM("Test PeekEnv and Provide") {
       val compileResult =
         ZFlow.input[String].provide("Some input").evaluateTestInMem(implicitly[Schema[String]], nothingSchema)
       assertM(compileResult)(equalTo("Some input"))

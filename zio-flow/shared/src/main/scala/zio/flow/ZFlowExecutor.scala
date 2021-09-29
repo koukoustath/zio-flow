@@ -187,7 +187,7 @@ object ZFlowExecutor {
             status <- compile(promise, ref, input, flow.provide(lit(input)))
           } yield status
 
-        case Input() => ZIO.succeed(input.asInstanceOf[A]).to(promise) as CompileStatus.Done
+        case PeekEnv() => ZIO.succeed(input.asInstanceOf[A]).to(promise) as CompileStatus.Done
 
         case Ensuring(flow, finalizer) =>
           for {
@@ -285,7 +285,7 @@ object ZFlowExecutor {
             innerPromise <- Promise.make[provide.ValueE, provide.ValueA]
             status       <- eval(provide.value).flatMap(valueA =>
                               compile(innerPromise, ref, valueA, provide.flow)
-                            ) //TODO : Input is provided in compile
+                            ) //TODO : PeekEnv is provided in compile
             flowStatus   <- if (status == CompileStatus.Done) innerPromise.await.to(promise) as CompileStatus.Done
                             else innerPromise.await.to(promise).forkDaemon as CompileStatus.Suspended
           } yield flowStatus

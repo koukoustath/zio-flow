@@ -36,7 +36,8 @@ sealed trait ZFlow[-R, +E, +A] {
   final def catchAll[R1 <: R, E1 >: E, A1 >: A: Schema, E2](f: Remote[E] => ZFlow[R1, E2, A1]): ZFlow[R1, E2, A1] =
     (self: ZFlow[R, E, A1]).foldM(f, ZFlow(_))
 
-  final def ensuring(flow: ZFlow[Any, Nothing, Any]): ZFlow[R, E, A] = ZFlow.Ensuring(self, flow)
+  final def ensuring[R1 <: R](finalizer: ZFlow[R1, Nothing, Any]): ZFlow[R1, E, A] =
+    ZFlow.input[R1].flatMap(r1 => ZFlow.Ensuring(self, finalizer.provide(r1)))
 
   final def flatMap[R1 <: R, E1 >: E, B](f: Remote[A] => ZFlow[R1, E1, B]): ZFlow[R1, E1, B] =
     self.foldM(ZFlow.Fail(_), f)
@@ -121,6 +122,7 @@ object ZFlow {
     type ValueA = A
     type ValueR = R
     type ValueB = B
+
   }
 
   final case class Fold1[R, E1, E2, A, B](
@@ -134,17 +136,17 @@ object ZFlow {
     type ValueB = B
   }
 
-  final case class ApplyFunction[R, E, A, B](f: Remote[A] => ZFlow[R, E, B], a: Remote[A]) extends ZFlow[R, E, B]
-
   final case class Log(message: String) extends ZFlow[Any, Nothing, Unit]
 
   final case class RunActivity[R, A](input: Remote[R], activity: Activity[R, A]) extends ZFlow[Any, ActivityError, A]
 
   final case class Transaction[R, E, A](workflow: ZFlow[R, E, A]) extends ZFlow[R, E, A]
 
-  final case class Input[R]() extends ZFlow[R, Nothing, R]
+  final case class PeekEnv[R]() extends ZFlow[R, Nothing, R] //TODO : group with popenv and pushenv
 
-  final case class Ensuring[R, E, A](flow: ZFlow[R, E, A], finalizer: ZFlow[R, Nothing, Any]) extends ZFlow[R, E, A]
+  final case class PeekEnv1[R, E, A](zflow : ZFlow[R,E,A]) extends ZFlow[Any, E, A]
+
+  final case class Ensuring[R, E, A](flow: ZFlow[R, E, A], finalizer: ZFlow[Any, Nothing, Any]) extends ZFlow[R, E, A]
 
   final case class Unwrap[R, E, A](remote: Remote[ZFlow[R, E, A]]) extends ZFlow[R, E, A]
 
@@ -183,11 +185,15 @@ object ZFlow {
 
   final case class NewVar[A](name: String, initial: Remote[A]) extends ZFlow[Any, Nothing, Variable[A]]
 
-  case class Iterate[R, E, A](
+  final case class Iterate[R, E, A](
     initial: Remote[A],
     step: Remote[A] => ZFlow[R, E, A],
     predicate: Remote[A] => Remote[Boolean]
   ) extends ZFlow[R, E, A]
+
+  final case class PushEnv[A](env: Remote[A]) extends ZFlow[Any, Nothing, Unit]
+
+  case object PopEnv extends ZFlow[Any, Nothing, Unit]
 
   def apply[A: Schema](a: A): ZFlow[Any, Nothing, A] = Return(Remote(a))
 
@@ -214,7 +220,7 @@ object ZFlow {
   def ifThenElse[R, E, A](p: Remote[Boolean])(ifTrue: ZFlow[R, E, A], ifFalse: ZFlow[R, E, A]): ZFlow[R, E, A] =
     ZFlow.unwrap(p.ifThenElse(ifTrue, ifFalse))
 
-  def input[R]: ZFlow[R, Nothing, R] = Input[R]()
+  def input[R]: ZFlow[R, Nothing, R] = PeekEnv[R]()
 
   def newVar[A](name: String, initial: Remote[A]): ZFlow[Any, Nothing, Variable[A]] = NewVar(name, initial)
 
