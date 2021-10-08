@@ -38,8 +38,8 @@ final case class PersistentExecutor(
 
   def coerceRemote[A](remote: Remote[_]): Remote[A] = remote.asInstanceOf[Remote[A]]
 
-  def applyFunction[R, E, A, B](f: Remote[A] => ZFlow[R, E, B], env: SchemaAndValue[R]): ZFlow[A, E, B] =
-    ZFlow.input[A].flatMap(a => f(a).provide(env.toRemote))
+  def applyFunction[R, E, A, B](erasedCont: ErasedCont): Erased =
+    ZFlow.input[Any].flatMap(erasedCont)
 
   //
   //    // 1. Read the environment `A` => ZFlow.Input (peek the environment)
@@ -82,8 +82,10 @@ final case class PersistentExecutor(
                     state.result.succeed(schemaAndValue.value: A).unit
                   }
                 case k :: newStack =>
-                  ref.update(_.copy(current = k.onSuccess.provide(coerceRemote(value)), stack = newStack)) *>
+                  eval(value).flatMap { schemaAndValue =>
+                  ref.update(_.copy(current = k.onSuccess, stack = newStack, envStack = schemaAndValue :: state.envStack.tail)) *>
                     step(ref)
+                  }
               }
             }
 
@@ -180,9 +182,8 @@ final case class PersistentExecutor(
 
           case fold@Fold(_, _, _) =>
             ref.update { state =>
-              val env = state.currentEnvironment
-              val errorFlow = applyFunction(eraseCont(fold.ifError), env)
-              val successFlow = applyFunction(eraseCont(fold.ifSuccess), env)
+              val errorFlow = applyFunction(eraseCont(fold.ifError))
+              val successFlow = applyFunction(eraseCont(fold.ifSuccess))
               val cont = Continuation(errorFlow, successFlow)
               state.copy(current = fold.value, stack = cont :: state.stack)
             } *> step(ref)
@@ -220,8 +221,10 @@ final case class PersistentExecutor(
 
           case Ensuring(flow, finalizer) =>
             ref.get.flatMap { state =>
-              //val cont = Continuation(finalizer, finalizer)
-              val cont = Finalizer(finalizer)
+            val cont = Continuation(
+              ZFlow.input[Any].flatMap(e => finalizer *> ZFlow.fail(e)),
+              ZFlow.input[Any].flatMap(a => finalizer *> ZFlow.succeed(a))
+            )
               ref.update(_.copy(current = flow, stack = cont :: state.stack)) *>
                 step(ref)
             }
@@ -267,8 +270,7 @@ final case class PersistentExecutor(
           //TODO : instead of Provide, use ZFlow.pushEnv and ZFlow.popEnv. Implement Provide in terms of pushEnv, popEnv, Ensuring
           case Provide(value, flow) =>
             eval(value).flatMap { schemaAndValue =>
-              ref.update(state => state.pushEnv(schemaAndValue).copy(current = flow)) *> step(ref)
-              //TODO : Missing - pop environment
+              ref.update(state => state.pushEnv(schemaAndValue).copy(current = flow.ensuring(PopEnv))) *> step(ref)
             }
 
           case Die => ZIO.die(new IllegalStateException("Could not evaluate ZFlow"))
@@ -470,7 +472,7 @@ final case class PersistentExecutor(
     val durablePZio =
       Promise.make[E, A].map(promise => DurablePromise.make[E, A](uniqueId + "_result", durableLog, promise))
     val stateZio = durablePZio.map(dp =>
-      State(uniqueId, flow, TState.Empty, Nil, Map(), dp, Nil, 0, Nil, PersistentCompileStatus.Running)
+      State(uniqueId, flow, TState.Empty, Nil, Map(), dp, List(SchemaAndValue(Schema[Unit], ())), 0, Nil, PersistentCompileStatus.Running)
     )
 
     (for {
@@ -488,8 +490,6 @@ object PersistentExecutor {
                            onError: ZFlow[_, _, _],
                            onSuccess: ZFlow[_, _, _]
                          )
-
-  final case class Finalizer(zFlow: ZFlow[_, _, _]) extends Continuation(zFlow, zFlow)
 
   object Continuation {
     def handleError[E, A: Schema](onError: ZFlow[_, _, _]): Continuation =
@@ -529,6 +529,8 @@ object PersistentExecutor {
     def currentEnvironment: SchemaAndValue[_] = envStack.headOption.getOrElse(SchemaAndValue[Unit](Schema[Unit], ()))
 
     def pushEnv(schemaAndValue: SchemaAndValue[_]): State[E, A] = copy(envStack = schemaAndValue :: envStack)
+
+    def popEnv(): State[E, A] = copy(envStack = envStack.tail)
 
     def addCompensation(newCompensation: ZFlow[Any, ActivityError, Any]): State[E, A] =
       copy(tstate = tstate.addCompensation(newCompensation))

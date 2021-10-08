@@ -17,6 +17,9 @@ trait SchemaAndValue[+A] { self =>
   def toRemote: Remote[A] = Remote.Literal(value, schema)
 
   def unsafeCoerce[B]: SchemaAndValue[B] = self.asInstanceOf[SchemaAndValue[B]]
+
+  override def toString: String =
+    s"SchemaAndValue($schema, $value)"
 }
 
 object SchemaAndValue {
