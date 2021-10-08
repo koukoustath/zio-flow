@@ -56,9 +56,26 @@ object PersistentExecutorSpec extends ZIOFlowBaseSpec {
       } yield a).evaluateLivePersistent(implicitly[Schema[Int]], nothingSchema)
       assertM(compileResult)(equalTo(12))
     },
-    testM("Test Provide") {
+    testM("Test Provide Simple") {
       val compileResult = ZFlow.succeed(12).provide(15).evaluateLivePersistent(implicitly[Schema[Int]], nothingSchema)
       assertM(compileResult)(equalTo(12))
+    },
+    testM("Test Ensuring") {
+      val compileResult = ZFlow.succeed(12).ensuring(ZFlow.succeed(15)).evaluateLivePersistent(implicitly[Schema[Int]], nothingSchema)
+      assertM(compileResult)(equalTo(12))
+    },
+    testM("Test Provide Advanced") {
+      val flow = for {
+        a <- ZFlow.input[Int]
+        b <- ZFlow.input[Int]
+      } yield (a + b)
+      val flow2 = for {
+        a <- flow.provide(15)
+        b <- ZFlow.input[Int]
+      } yield (a + b)
+      
+      val compileResult = flow2.provide(30).evaluateLivePersistent(implicitly[Schema[Int]], nothingSchema)
+      assertM(compileResult)(equalTo(60))
     }
   )
 

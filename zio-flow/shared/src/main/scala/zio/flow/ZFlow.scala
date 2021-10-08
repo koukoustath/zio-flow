@@ -82,6 +82,12 @@ sealed trait ZFlow[-R, +E, +A] {
   final def orTry[R1 <: R, E1 >: E, A1 >: A](that: ZFlow[R1, E1, A1]): ZFlow[R1, E1, A1] =
     ZFlow.OrTry(self, that)
 
+  private[flow] final def pushEnv(r: Remote[R]): ZFlow[Any, E, A] =
+    ZFlow.PushEnv(r, self)
+
+  private[flow] final def popEnv: ZFlow[R, E, A] =
+    ZFlow.PopEnv(self)
+
   final def provide(value: Remote[R]): ZFlow[Any, E, A] = ZFlow.Provide(value, self)
 
   final def timeout(duration: Remote[Duration]): ZFlow[R, E, Option[A]] =
@@ -189,9 +195,9 @@ object ZFlow {
     predicate: Remote[A] => Remote[Boolean]
   ) extends ZFlow[R, E, A]
 
-  case class PushEnv[A](env: Remote[A]) extends ZFlow[Any, Nothing, Unit]
+  case class PushEnv[R, E, A](env: Remote[R], flow: ZFlow[R, E, A]) extends ZFlow[Any, E, A]
 
-  case object PopEnv extends ZFlow[Any, Nothing, Unit]
+  case class PopEnv[R, E, A](flow: ZFlow[R, E, A]) extends ZFlow[R, E, A]
 
   def apply[A: Schema](a: A): ZFlow[Any, Nothing, A] = Return(Remote(a))
 
@@ -257,4 +263,7 @@ object ZFlow {
 
   def applyFunction[R, E, A, B](f: Remote[A] => ZFlow[R, E, B], remoteA: Remote[A]): ZFlow[R, E, B] =
     ApplyFunction(f, remoteA)
+
+  private[flow] val popEnv: ZFlow[Any, Nothing, Unit] =
+    PopEnv(ZFlow.unit)
 }
