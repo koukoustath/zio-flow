@@ -3,7 +3,7 @@ name: CI
 on:
   pull_request:
   push:
-    branches: [main]
+    branches: [feat-create-extension-methods-on-remote-instant]
   release:
     types:
       - published
@@ -23,7 +23,7 @@ jobs:
         uses: coursier/cache-action@v5
       - name: Lint code
         run: sbt fmtCheck fixCheck
-  
+
   test:
     runs-on: ubuntu-20.04
     timeout-minutes: 30
